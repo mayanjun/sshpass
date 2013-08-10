@@ -1,0 +1,180 @@
+#! /usr/bin/perl -w
+# This is a ultra utility used to login a host quickly with ssh.
+#
+# Copyright 2013 mayanjun
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# @author mayanjun
+# @date 2013-08-08
+# @version 1.0
+# @email mayanjun396@163.com
+
+use strict;
+use 5.010;
+# start perl programming
+
+############ define global variables ############
+my $prog_name = "sshpass";
+my $clip_cmd = "";
+my %HOSTS = (
+	# host format: LAN-IP,WAN-IP,user,password,ssh-port,description
+	"host1" => ["192.168.1.10","000.000.000.000","root","password","22","Testing server"],
+	"host2"  => ["192.168.1.10","000.000.000.000","root","password","8080","FTP server"],
+	"host3" => ["192.168.1.10","000.000.000.000","root","password","22","Database server"],
+	"host4" => ["192.168.1.10","000.000.000.000","root","password","22","OA Server"]
+	# you can add more host here...
+);
+my $msg_nf = "No host alias found,please select a host:";
+my $alias = undef;
+my $option = undef;
+my $version_name = "sshpass 1.0";
+############ sub routine ############
+# login system
+sub login {
+	if(defined($alias)) {
+		if(exists($HOSTS{$alias})) {
+			my $host = $HOSTS{$alias}[0];
+			if(defined($option) && $option eq "-w") {
+				$host = $HOSTS{$alias}[1];	
+			}
+			&copyPassword($HOSTS{$alias}[3]);
+			my $cmd = "ssh -p " . $HOSTS{$alias}[4] . " " . $HOSTS{$alias}[2] ."@" . $host;
+			say "Using command: $cmd";
+			say "Logining,please wait...";
+			exec($cmd);
+		}else {
+			say $msg_nf;
+			&selectHost();
+		}
+	}else {
+		say $msg_nf;
+		&selectHost();
+	}
+}
+
+# Copy the password to sysytem clipbroad
+# @paramater password host password
+sub copyPassword{
+	my $pass = shift @_;
+	$pass =~ s/\`/\\\`/;
+	$pass =~ s/\"/\\\"/;
+	$pass =~ s/\'/\\\'/;
+	system("echo $pass|$clip_cmd");
+}
+
+# List all host declared in %HOSTS
+sub list {
+	say "All hosts: Alias:User\@LAN/WAN:Port";
+	say "-" x 40;
+	while((my $key, my @value) = each %HOSTS){
+		say "$key:$value[0][2]\@$value[0][0]/$value[0][1]:$value[0][4]($value[0][5])";
+	}
+}
+
+# Trim a string
+# @paramater src the string to be trimed
+# @return returns the trimed string
+sub trim{
+	my $s = shift @_;
+	if(defined($s)) {
+		$s =~ s/^\s+//; 
+		$s =~ s/\s+$//; 
+	}
+	return $s;
+}
+
+# Select a host by alias,note that the value of alias have been set to variable $alias
+sub selectHost {
+	say "-" x 40;
+	while((my $key, my @value) = each %HOSTS){
+		say " " . $key . ": " . $value[0][2] . "@" . $value[0][0] . ":" . $value[0][4] . "(" . $value[0][5] . ")";
+	}
+	print "Your select: ";
+	chomp(my $host = <STDIN>);
+	if($host) {
+		if($host eq "quit" || $host eq "exit") {
+			say "Bye";
+		} else {
+			$alias = $host;
+			&login();
+		}
+	}else {
+		&selectHost();
+	}
+}
+
+# Show help information
+sub help{
+	say "This is a ultra utility used to login a host quickly with ssh.";
+	say "-" x 20;
+	say "Usage: $prog_name [host-alias] [option]" . 
+	"\nOptions:" . 
+	"\n  -w: login with WAN IP,by default use LAN IP" . 
+	"\n  -l,--list: list all hosts" . 
+	"\n  -h,--help: show help message";
+	say "Add a host:" .
+	"\n  You can edit the source code to add a host alias to \$HOSTS.".
+	"\n  Note that you must escape character \$,\@,\%,\" and \\ by prifix" .
+	"\n  \\ if there is any of it in your string. Note that the \"quit\" and".
+	"\n  \"exit\" can not be set to alias cause by reserved.";
+	say "Copy password into clipboard automaticlly:" .
+	"\n  This feature is convenient that you can press CTRL+V to input " . 
+	"\n  password when system prompt you enter password after you select".
+	"\n  a valid host successfully";
+	say "-" x 20;
+	
+}
+
+sub showVersion{
+	say "\@version $version_name";
+	say "\@author mayanjun";
+	say "\@date 2013-08-08";
+	say "\@email mayanjun396\@163.com";
+}
+
+# Initialize system
+sub init{
+	chomp(my $os = `uname -s`);
+	if($os eq "Darwin") {
+		$clip_cmd = "pbcopy";
+	}elsif($os eq "Linux") {
+		$clip_cmd = "xsel";
+	}else {
+		$clip_cmd = "clip";
+	}
+}
+
+# The main sub routine
+sub main{
+	&init();
+	($alias,$option) = @ARGV;
+	if($alias =~ /^-.+/) {
+		if($alias =~ /^-h.*/ || $alias =~ /^--help.*/) {
+			&help();
+		}elsif($alias =~ /^-l.*/ || $alias =~ /^--list.*/){
+			&list();
+		}elsif($alias =~ /^-v.*/ || $alias =~ /^--version.*/){
+			&showVersion();
+		}elsif($alias =~ /^-w.*/){
+			($alias,$option) = (undef,"-w");
+			&login();
+		}else {
+			&login();
+		}
+	}else {
+		&login();
+	}
+}
+############ main ############
+&main();
